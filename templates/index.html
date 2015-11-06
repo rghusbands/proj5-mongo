@@ -36,26 +36,89 @@
   {% endif %}
 {% endwith %}
 
-<h1>Memos</h1>
+<h1>Memos:</h1>
 
+<!-- This refreshes and shows all the memos in session  -->
 {% if session.memos %}
     {% for memo in session.memos %}
   <div class="memo">
   <div class="row">
+  <div class="subrow" style="border: thin green solid">
   <div class="col-md-2">
-    {{ memo.date | humanize }}
+      {{ memo.date | normal }}
   </div>
-  <div class="col-md-10">
+  <div class="col-md-8">
     {{ memo.text }}
+  </div>
+  </div>
+  <div class="col-md-2">
+      <button id="deltebtn" onclick="deleteMemo('{{memo._id}}')">Delete</button>
   </div>
   </div> <!-- row -->
   </div> <!-- memo -->
+  <br> <!-- split up memos -->
   {% endfor %}
 {% else %}
   <p>No memos for you. </p>  
 {% endif %}
 
- 
+<div id="parent">
+</div>
+
+<br>
+<br>
+
+<div class="row">
+    <label class="col-md-4">Add Memos(please input correct values): </label>
+</div>
+
+<!--inputs memos-->
+<div class="row">
+    <input class="col-md-2" id="date" placeholder="MM/DD/YYYY"/>
+    <input type="text" class="col-md-6" id="newmemo" placeholder="Write Memo Here"/>
+    <button type="button" onclick="newMemoEntered()">Add</button>
+</div>
+
+<script type="text/javascript">
+    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+
+    //delete a memo
+    function deleteMemo(mem){
+        var deleteId = mem;
+
+        $.getJSON($SCRIPT_ROOT + '/_deletememo',
+                {Id:deleteId},
+                function(data){
+                    clear();
+                    var time = data.result;
+                });
+    };
+
+    function clear(){
+        
+        //Unnecessary with page reloading.
+        //var e_date = $('#date').val("");
+        //var e_newmemo = $('#newmemo').val("");
+
+        //refresh page to clear the inputs
+        //and display new memos.
+        location.reload(true);
+    };
+
+    //enter new memo
+    function newMemoEntered(){
+        var e_date = $('#date').val();
+        var e_newmemo = $('#newmemo').val();
+
+        $.getJSON($SCRIPT_ROOT + '/_newMemoEntered',
+                {date:e_date, newmemo:e_newmemo},
+                function(data){
+                    clear();
+                    var time = data.result;
+                });
+    };
+
+</script>
 
 </div> <!-- container -->
 </body>

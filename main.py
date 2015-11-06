@@ -2,7 +2,7 @@
 Flask web app connects to Mongo database.
 Keep a simple list of dated memoranda.
 
-Representation conventions for dates: 
+Representation conventions for dates:
    - In the session object, date or datetimes are represented as
    ISO format strings in UTC.  Unless otherwise specified, this
    is the format passed around internally. Note that ordering
@@ -11,24 +11,26 @@ Representation conventions for dates:
    - Database representation is as MongoDB 'Date' objects
    Note that this means the database may store a date before or after
    the date specified and viewed by the user, because 'today' in
-   Greenwich may not be 'today' here. 
+   Greenwich may not be 'today' here.
 """
 
 import flask
 from flask import render_template
 from flask import request
 from flask import url_for
+from flask import jsonify
 
 import json
 import logging
 
-# Date handling 
+# Date handling
 import arrow # Replacement for datetime, based on moment.js
 import datetime # But we may still need time
 from dateutil import tz  # For interpreting local times
 
 # Mongo database
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 
 ###
@@ -38,7 +40,7 @@ import CONFIG
 
 app = flask.Flask(__name__)
 
-try: 
+try:
     dbclient = MongoClient(CONFIG.MONGO_URL)
     db = dbclient.memos
     collection = db.dated
@@ -84,14 +86,45 @@ def page_not_found(error):
 #
 #################
 
-# NOT TESTED with this application; may need revision 
+# NOT TESTED with this application; may need revision
 #@app.template_filter( 'fmtdate' )
 # def format_arrow_date( date ):
-#     try: 
+#     try:
 #         normal = arrow.get( date )
 #         return normal.to('local').format("ddd MM/DD/YYYY")
 #     except:
 #         return "(bad date)"
+
+#This function takes the inputted memo from the
+#html and javascript and puts it into the collection
+#by passing it through put_memo.
+@app.route('/_newMemoEntered')
+def newMemo():
+    date = request.args.get('date', 0, type=str)
+    thememo = request.args.get('newmemo', 1, type=str)
+    put_memo(date, thememo)
+    message = ""
+    return jsonify(result = message)
+
+@app.route('/_deletememo')
+def deleteMemo():
+    Id = request.args.get('Id', 0, type=str)
+    print(Id)
+    collection.remove({'_id': ObjectId(Id)})
+    message = ""
+    return jsonify(result = message)
+
+#Could go to the minute for the memos.
+#All you would have to do is require it in the input
+#and change a of the arrow formats.
+@app.template_filter( 'normal' )
+def weirdToNormal(date):
+    return arrow.get(date).format("DD/MM/YYYY")
+
+@app.template_filter( '' )
+def deleteMemo():
+
+    return
 
 @app.template_filter( 'humanize' )
 def humanize_arrow_date( date ):
@@ -99,18 +132,18 @@ def humanize_arrow_date( date ):
     Date is internal UTC ISO format string.
     Output should be "today", "yesterday", "in 5 days", etc.
     Arrow will try to humanize down to the minute, so we
-    need to catch 'today' as a special case. 
+    need to catch 'today' as a special case.
     """
     try:
         then = arrow.get(date).to('local')
         now = arrow.utcnow().to('local')
         if then.date() == now.date():
             human = "Today"
-        else: 
+        else:
             human = then.humanize(now)
             if human == "in a day":
                 human = "Tomorrow"
-    except: 
+    except:
         human = date
     return human
 
@@ -126,27 +159,29 @@ def get_memos():
     can be inserted directly in the 'session' object.
     """
     records = [ ]
-    for record in collection.find( { "type": "dated_memo" } ):
+    for record in collection.find({ "type": "dated_memo" }).sort("date",1):
         record['date'] = arrow.get(record['date']).isoformat()
-        del record['_id']
+        record['_id'] = str(record['_id'])
         records.append(record)
-    return records 
+    return records
 
+#puts into collection
+def put_memo(dt, mem):
+    """
+    Place memo into database
+    Args:
+        dt: Datetime (arrow) object
+        mem: Text of memo
+    """
 
-# def put_memo(dt, mem):
-#     """
-#     Place memo into database
-#     Args:
-#        dt: Datetime (arrow) object
-#        mem: Text of memo
-#     NOT TESTED YET
-#     """
-#     record = { "type": "dated_memo", 
-#                "date": dt.to('utc').naive,
-#                "text": mem
-#             }
-#     collection.insert(record)
-#     return 
+    date = arrow.get(dt, 'DD/MM/YYYY').to('utc').naive
+    record = { "type": "dated_memo",
+               "date": date,
+               "text": mem
+               }
+    collection.insert(record)
+    return
+
 
 
 if __name__ == "__main__":
@@ -161,7 +196,7 @@ if __name__ == "__main__":
         # Reachable only from the same computer
         app.run(port=CONFIG.PORT)
     else:
-        # Reachable from anywhere 
+        # Reachable from anywhere
         app.run(port=CONFIG.PORT,host="0.0.0.0")
 
-    
+
